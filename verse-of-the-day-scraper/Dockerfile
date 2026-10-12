@@ -12,4 +12,5 @@ RUN chmod +x ./entrypoint.sh
 
 EXPOSE 8080
 
-ENTRYPOINT ["dumb-init", "/home/node/app/entrypoint.sh"]
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+CMD ["/home/node/app/entrypoint.sh"]
