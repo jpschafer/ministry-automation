@@ -1,0 +1,6 @@
+# Shared by api/youtube_videos.py and video_sorter/video_sorter.py
+# Requires Python 3.10+ (uses `X | None` type hints).
+google-api-python-client>=2.0
+google-auth-oauthlib>=1.0
+google-auth-httplib2>=0.1
+ 

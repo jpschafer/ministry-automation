@@ -1,4 +1,8 @@
-""" Zapier Module that Processes two Regex Patterns as Paths, and Sends a YouTube Video to One Page or Another Based on Regex Patterns of Title of Video. Useful if you have Two Facebook Pages for Two Churches, but have one YouTube Channel for your Charge """
+""" Zapier Module that Processes two Regex Patterns as Paths, 
+and Sends a YouTube Video to One Page or 
+Another Based on Regex Patterns of Title of Video. 
+Useful if you have Two Facebook Pages for Two Churches, 
+but have one YouTube Channel for your Charge """
 
 # Import necessary libraries
 import json
@@ -29,6 +33,8 @@ def post_video_to_page(data):
         return publish_facebook_post(
             video_title, video_url, data["page_token_2"], page_url_2
         )
+    else:
+        return None  # Nothing to Output
 
 
 def publish_facebook_post(text, url, fb_page_token, page_url):
