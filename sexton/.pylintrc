@@ -1,0 +1,13 @@
+[FORMAT]
+max-line-length = 120
+
+[DESIGN]
+max-args = 8
+max-positional-arguments = 8
+max-locals = 20
+max-attributes = 10
+min-public-methods = 0
+
+[MESSAGES CONTROL]
+# Tests and fakes are self-explanatory; docstrings on every fake method add noise.
+disable = missing-function-docstring, missing-class-docstring, use-implicit-booleaness-not-comparison

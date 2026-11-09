@@ -1,0 +1,25 @@
+name: Sexton
+
+on:
+  push:
+    paths:
+      - "sexton/**"
+      - ".github/workflows/sexton.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sexton
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+    - name: Install dependencies
+      run: pip install -r requirements-dev.txt
+    - name: Pylint
+      run: pylint --rcfile=.pylintrc sexton tests
+    - name: Tests
+      run: pytest

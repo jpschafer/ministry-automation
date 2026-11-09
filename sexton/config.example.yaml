@@ -1,0 +1,42 @@
+# Copy to config.yaml. No secrets here: every *_env names an environment variable.
+
+core:
+  url: http://restreamer:8080        # Restreamer Core API, as reachable from the sexton container
+  username_env: CORE_USERNAME        # omit both if Core API auth is disabled
+  password_env: CORE_PASSWORD
+
+tick_seconds: 10
+grace_seconds: 180      # push must be gone this long before the broadcast is ended
+verify_seconds: 120     # alert if not LIVE this long after the egress starts
+fb_poll_seconds: 30     # how often to re-read Facebook once a stream is steady
+
+inputs:
+  colfax:
+    # Restreamer channel push name: <channel id>.stream (the channel id is in the
+    # Restreamer UI URL for that channel, and in its RTMP push address).
+    rtmp_name: 00000000-0000-0000-0000-000000000000.stream
+    # Titles must be unique per input: they are how Sexton recognises its own
+    # video on the shared profile after a restart.
+    title: "Colfax UMC Worship"
+    description: ""
+    destinations:
+      page:
+        target: "<colfax page id>"
+        token_env: FB_TOKEN_COLFAX_PAGE
+      profile:
+        target: me
+        token_env: FB_TOKEN_USER
+        # Optional Graph privacy object. {"value": "SELF"} is handy for a test run.
+        # privacy: {"value": "EVERYONE"}
+
+  levels:
+    rtmp_name: 11111111-1111-1111-1111-111111111111.stream
+    title: "Levels UMC Worship"
+    description: ""
+    destinations:
+      page:
+        target: "<levels page id>"
+        token_env: FB_TOKEN_LEVELS_PAGE
+      profile:
+        target: me
+        token_env: FB_TOKEN_USER
