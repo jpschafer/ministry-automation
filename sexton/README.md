@@ -74,7 +74,28 @@ Tests: `pip install -r requirements-dev.txt && pytest`
 ## Renewing the Facebook user token
 
 The user token (profile streaming) lasts about 60 days, and Facebook requires a
-login for every new one. Page tokens don't expire. To renew:
+login for every new one. Page tokens don't expire.
+
+### On a Mac (recommended)
+
+`macos/` holds a launchd agent that checks the token every day at 9:00 (and at
+login). When Facebook reports it expires within 10 days, or it's invalid, you get a
+notification, and Terminal opens `renew.command`, which opens Graph API Explorer,
+exchanges the token you paste, saves it to the Keychain, and copies it to the
+clipboard for pasting into the Unraid template.
+
+```sh
+sexton/macos/install.sh              # install; runs a first check right away
+sexton/macos/renew.command           # renew by hand at any time
+sexton/macos/install.sh --uninstall  # remove
+```
+
+The app ID, app secret and current token live in the login Keychain under the
+service `sexton-facebook`. Log: `~/Library/Logs/sexton-fb-token.log`.
+
+### From the container
+
+To renew from Unraid instead:
 
 ```sh
 docker exec -it sexton python -m sexton.renew_token
