@@ -71,6 +71,20 @@ Template: sexton) or `docker-compose.example.yml`.
 
 Tests: `pip install -r requirements-dev.txt && pytest`
 
+## Renewing the Facebook user token
+
+The user token (profile streaming) lasts about 60 days, and Facebook requires a
+login for every new one. Page tokens don't expire. To renew:
+
+```sh
+docker exec -it sexton python -m sexton.renew_token
+```
+
+It prints the Graph API Explorer steps, asks for your app ID, app secret and the
+short-lived token (hidden input; or set `FB_APP_ID` / `FB_APP_SECRET`), and prints
+the new long-lived token, its expiry date, and fresh Page tokens. Paste them into
+the container's variables and restart. It changes nothing on its own.
+
 ## To verify before the first real Sunday
 
 These weren't confirmable from documentation. Each is isolated in one place in

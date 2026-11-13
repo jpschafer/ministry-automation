@@ -59,7 +59,7 @@ class GraphClient:
         )
         if resp is None:  # dry-run skipped it
             return None
-        return _check(resp, f"{method} /{path}")
+        return check_response(resp, f"{method} /{path}")
 
     def active_live_videos(self, target, token):
         """Live videos on target whose status is in ACTIVE_STATUSES."""
@@ -113,7 +113,8 @@ class GraphClient:
         self._call("POST", video_id, token, mutating=True, data={"end_live_video": "true"})
 
 
-def _check(resp, what):
+def check_response(resp, what):
+    """Returns the JSON body of a Graph response, or raises a typed ApiError."""
     try:
         body = resp.json()
     except ValueError:
