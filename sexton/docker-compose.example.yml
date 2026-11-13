@@ -1,16 +1,16 @@
 # Unraid: Compose Manager plugin, or translate into a container template.
-# Put config.yaml in /mnt/user/appdata/sexton/ and secrets in sexton.env (chmod 600).
+# Put config.yaml in /mnt/user/appdata/automation/sexton/ and secrets in sexton.env (chmod 600).
 services:
   sexton:
-    build: .            # or image: <your registry>/sexton:latest
+    image: jpschafer/sexton:latest   # or build: . from this directory
     container_name: sexton
     restart: unless-stopped
     # Join the network Restreamer is on so core.url can be http://restreamer:8080.
     networks: [restreamer]
     volumes:
-      - /mnt/user/appdata/sexton:/config:ro
+      - /mnt/user/appdata/automation/sexton:/config:ro
     env_file:
-      - /mnt/user/appdata/sexton/sexton.env
+      - /mnt/user/appdata/automation/sexton/sexton.env
     # Add "--dry-run" here for a first run against the real instance.
     command: ["--config", "/config/config.yaml"]
 
