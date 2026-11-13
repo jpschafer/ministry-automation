@@ -65,7 +65,9 @@ docker run --rm --env-file sexton.env -v $PWD:/config:ro sexton --dry-run --once
 
 `--dry-run` performs all reads but logs (and skips) every create/end/delete,
 ntfy alert and healthcheck ping. `--once` runs a single tick. Logs are JSON lines
-on stdout. See `docker-compose.example.yml` for Unraid.
+on stdout. For Unraid, use `unraid-template.xml` (copy it to
+`/boot/config/plugins/dockerMan/templates-user/my-sexton.xml`, then Add Container →
+Template: sexton) or `docker-compose.example.yml`.
 
 Tests: `pip install -r requirements-dev.txt && pytest`
 

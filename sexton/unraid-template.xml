@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<!-- Unraid Docker template. Copy to /boot/config/plugins/dockerMan/templates-user/my-sexton.xml,
+     then Docker tab -> Add Container -> Template: sexton. config.yaml goes in the Config folder. -->
+<Container version="2">
+  <Name>sexton</Name>
+  <Repository>jpschafer/sexton:latest</Repository>
+  <Registry>https://hub.docker.com/r/jpschafer/sexton</Registry>
+  <Network>bridge</Network>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/jpschafer/ministry-automation</Support>
+  <Project>https://github.com/jpschafer/ministry-automation/tree/main/sexton</Project>
+  <Overview>Puts each church's Restreamer push live on Facebook (Page and profile) when the push starts, and ends the broadcast 3 minutes after it stops. Reads /config/config.yaml. Add --dry-run to Post Arguments for a test run.</Overview>
+  <Category>Tools: MediaServer:Video</Category>
+  <ExtraParams>--restart unless-stopped --log-opt max-size=10m --log-opt max-file=3</ExtraParams>
+  <PostArgs/>
+  <Config Name="Config folder" Target="/config" Default="/mnt/user/appdata/automation/sexton" Mode="ro" Description="Holds config.yaml" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/automation/sexton</Config>
+  <Config Name="Core username" Target="CORE_USERNAME" Default="" Mode="" Description="Restreamer admin username" Type="Variable" Display="always" Required="true" Mask="false"></Config>
+  <Config Name="Core password" Target="CORE_PASSWORD" Default="" Mode="" Description="Restreamer admin password" Type="Variable" Display="always" Required="true" Mask="true"></Config>
+  <Config Name="FB user token" Target="FB_TOKEN_USER" Default="" Mode="" Description="Long-lived user token with publish_video (renew about every 60 days)" Type="Variable" Display="always" Required="true" Mask="true"></Config>
+  <Config Name="FB Colfax page token" Target="FB_TOKEN_COLFAX_PAGE" Default="" Mode="" Description="Colfax Page access token" Type="Variable" Display="always" Required="true" Mask="true"></Config>
+  <Config Name="FB Levels page token" Target="FB_TOKEN_LEVELS_PAGE" Default="" Mode="" Description="Levels Page access token" Type="Variable" Display="always" Required="true" Mask="true"></Config>
+  <Config Name="ntfy URL" Target="NTFY_URL" Default="" Mode="" Description="Full topic URL, e.g. https://ntfy.sh/your-random-topic" Type="Variable" Display="always" Required="false" Mask="false"></Config>
+  <Config Name="ntfy token" Target="NTFY_TOKEN" Default="" Mode="" Description="Optional ntfy access token" Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="Healthcheck URL" Target="HEALTHCHECK_URL" Default="" Mode="" Description="Healthchecks.io ping URL" Type="Variable" Display="always" Required="false" Mask="false"></Config>
+</Container>
