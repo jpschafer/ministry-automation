@@ -7,7 +7,11 @@ and makes the smallest change that moves them toward what should be true:
 
 Core and Facebook are the source of truth. The only memory kept between ticks is
 when each input stopped pushing (lost on restart, which can only delay an end),
-a short read cache for Facebook, and alert deduplication.
+a short read cache for Facebook, retry backoff, and alert deduplication.
+
+Facebook calls are rationed: a failing destination backs off exponentially, a
+rate-limit error pauses all Facebook work, and a destination that has been
+cleaned up after its push ended makes no calls until the next push.
 """
 
 from __future__ import annotations
@@ -16,9 +20,17 @@ import logging
 import time
 
 from .core import Egress, egress_id
+from .http import RateLimitError
 from .log import event
 
 log = logging.getLogger("sexton.reconcile")
+
+# A destination that keeps failing is retried after tick, 2x tick, 4x tick ...
+# up to this. Two broken destinations then cost ~24 calls/hour, not ~720.
+MAX_BACKOFF_SECONDS = 300
+# Facebook's rate limits are measured over a rolling hour; a quarter of that
+# gives usage room to drain. A running egress keeps streaming meanwhile.
+RATE_LIMIT_PAUSE_SECONDS = 900
 
 
 class Reconciler:
@@ -32,8 +44,11 @@ class Reconciler:
         self.clock = clock
         self._owner_by_title = {i.title: i.name for i in config.inputs}
         self._not_pushing_since = {}
-        self._settled = set()  # inputs already cleaned up since their push ended
+        self._settled = set()  # "input:dest" keys cleaned up since their push ended
         self._fb_cache = {}  # target -> (fetched_at, [LiveVideo])
+        self._failures = {}  # "input:dest" -> consecutive failure count
+        self._retry_at = {}  # "input:dest" -> earliest time to try again
+        self._fb_paused_until = 0.0
 
     def tick(self):
         """Runs one reconcile pass. Returns False if any step raised."""
@@ -51,30 +66,57 @@ class Reconciler:
         for inp in self.config.inputs:
             if inp.name in pushing:
                 self._not_pushing_since.pop(inp.name, None)
-                self._settled.discard(inp.name)
+                self._settled -= {f"{inp.name}:{d.name}" for d in inp.destinations}
             else:
                 self._not_pushing_since.setdefault(inp.name, now)
 
         ok = True
         for inp in self.config.inputs:
-            input_ok = True
             for dest in inp.destinations:
-                key = f"{inp.name}:{dest.name}"
-                try:
-                    if inp.name in pushing:
-                        self._reconcile_pushing(inp, dest, pushing, egresses, now)
-                    else:
-                        self._reconcile_idle(inp, dest, egresses, now)
-                    self.alerter.resolved(f"{key}:error")
-                except Exception as err:  # pylint: disable=broad-exception-caught
-                    # One destination failing must never stop the others.
-                    input_ok = False
-                    event(log, logging.ERROR, "reconcile_failed", key=key, error=describe(err))
-                    self.alerter.problem(f"{key}:error", f"Sexton: {key} failed", describe(err))
-            if input_ok and inp.name not in pushing and self._grace_over(inp, now):
-                self._settled.add(inp.name)
-            ok = ok and input_ok
+                ok = self._run_destination(inp, dest, pushing, egresses, now) and ok
         return ok
+
+    def _run_destination(self, inp, dest, pushing, egresses, now):
+        """Reconciles one input -> destination, isolating and rationing failures.
+        Returns False if it failed or is waiting out a backoff/pause."""
+        key = f"{inp.name}:{dest.name}"
+        if key in self._settled:
+            return True
+        if now < self._fb_paused_until or now < self._retry_at.get(key, 0):
+            return False
+        try:
+            if inp.name in pushing:
+                self._reconcile_pushing(inp, dest, pushing, egresses, now)
+            else:
+                self._reconcile_idle(inp, dest, egresses, now)
+        except RateLimitError as err:
+            self._fb_paused_until = now + RATE_LIMIT_PAUSE_SECONDS
+            event(log, logging.ERROR, "rate_limited", key=key, pause_seconds=RATE_LIMIT_PAUSE_SECONDS,
+                  error=describe(err))
+            self.alerter.problem(
+                "facebook:rate_limit",
+                "Sexton: Facebook rate limit",
+                f"Pausing all Facebook calls for {RATE_LIMIT_PAUSE_SECONDS // 60} min "
+                f"(running streams continue). {describe(err)}",
+            )
+            return False
+        except Exception as err:  # pylint: disable=broad-exception-caught
+            # One destination failing must never stop the others.
+            failures = self._failures.get(key, 0) + 1
+            self._failures[key] = failures
+            delay = min(self.config.tick_seconds * 2 ** (failures - 1), MAX_BACKOFF_SECONDS)
+            self._retry_at[key] = now + delay
+            event(log, logging.ERROR, "reconcile_failed", key=key, failures=failures,
+                  retry_in=delay, error=describe(err))
+            self.alerter.problem(f"{key}:error", f"Sexton: {key} failed", describe(err))
+            return False
+        self._failures.pop(key, None)
+        self._retry_at.pop(key, None)
+        self.alerter.resolved(f"{key}:error")
+        self.alerter.resolved("facebook:rate_limit")
+        if inp.name not in pushing and self._grace_over(inp, now):
+            self._settled.add(key)
+        return True
 
     # -- pushing ---------------------------------------------------------------
 
@@ -82,8 +124,10 @@ class Reconciler:
         key = f"{inp.name}:{dest.name}"
         pid = egress_id(inp.name, dest.name)
         egress = egresses.get(pid)
-        steady = egress is not None and now - egress.created_at > self.config.verify_seconds
-        videos = self._videos(dest, now, self.config.fb_poll_seconds if steady else 0)
+        # Read fresh only while verifying a new egress; otherwise (steady stream,
+        # contention, a foreign video) every fb_poll_seconds is plenty.
+        verifying = egress is not None and now - egress.created_at <= self.config.verify_seconds
+        videos = self._videos(dest, now, 0 if verifying else self.config.fb_poll_seconds)
 
         owned, others, foreign = [], [], []
         for video in videos:
@@ -169,7 +213,7 @@ class Reconciler:
     # -- not pushing -----------------------------------------------------------
 
     def _reconcile_idle(self, inp, dest, egresses, now):
-        if inp.name in self._settled or not self._grace_over(inp, now):
+        if not self._grace_over(inp, now):
             return
         pid = egress_id(inp.name, dest.name)
         for video in self._videos(dest, now, 0):

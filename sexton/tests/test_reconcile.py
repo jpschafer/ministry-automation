@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from sexton.http import ApiError, AuthError
+from sexton.http import ApiError, AuthError, RateLimitError
 from sexton.reconcile import Reconciler
 from tests.fakes import PROFILE, FakeAlerter, FakeClock, FakeCore, FakeGraph, make_config
 
@@ -235,3 +235,61 @@ def test_egress_create_failure_recovers_from_existing_video(failing):
     target = "colfax-page" if failing == "page" else PROFILE
     assert len(w.creates(target)) == 1  # reused the video created in the failed tick
     assert pid in w.core.egresses()
+
+
+def fb_calls(w, target):
+    """Graph calls that touched target (reads and creates)."""
+    return [c for c in w.graph.calls if c[1] == target]
+
+
+def test_persistent_failure_backs_off_instead_of_hammering():
+    w = World()
+    w.graph.fail[("list", PROFILE)] = AuthError("code=190")
+    w.push("colfax")
+    w.run(3600)
+    # Both inputs' profile destinations fail. Every-tick retries would be
+    # 720/hour; backoff caps each near 12/hour after warm-up.
+    assert len(fb_calls(w, PROFILE)) <= 40
+    assert len(w.graph.live("colfax-page")) == 1  # the healthy Page is unaffected
+    # Fixed: the next retry recovers and the alert clears.
+    del w.graph.fail[("list", PROFILE)]
+    w.run(300)
+    assert len(w.graph.live(PROFILE)) == 1
+    assert "colfax:profile:error" not in w.alerter.active
+
+
+def test_idle_failing_destination_does_not_poll_every_tick():
+    w = World()
+    w.graph.fail[("list", PROFILE)] = AuthError("code=190")
+    w.run(3600)  # nothing pushing at all
+    assert len(fb_calls(w, PROFILE)) <= 40
+    # Healthy Pages settle after one cleanup check each.
+    assert len(fb_calls(w, "colfax-page")) == 1
+    assert len(fb_calls(w, "levels-page")) == 1
+
+
+def test_rate_limit_pauses_all_facebook_calls_then_resumes():
+    w = World()
+    w.graph.fail[("create", "colfax-page")] = RateLimitError("code=4")
+    w.push("colfax")
+    w.run()
+    assert "facebook:rate_limit" in w.alerter.active
+    del w.graph.fail[("create", "colfax-page")]
+    before = len(w.graph.calls)
+    w.run(890)
+    assert len(w.graph.calls) == before  # paused: no Facebook calls at all
+    w.run(30)
+    assert len(w.graph.live("colfax-page")) == 1
+    assert len(w.graph.live(PROFILE)) == 1
+    assert "facebook:rate_limit" not in w.alerter.active
+
+
+def test_contention_reads_facebook_at_poll_rate_not_every_tick():
+    w = World()
+    w.push("colfax")
+    w.run(200)  # past Colfax's verification window, so its stream is steady
+    w.push("levels")
+    reads_before = len([c for c in w.graph.calls if c == ("list", PROFILE)])
+    w.run(600)
+    reads = len([c for c in w.graph.calls if c == ("list", PROFILE)]) - reads_before
+    assert reads <= 600 / 30 + 2

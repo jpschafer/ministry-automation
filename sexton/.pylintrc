@@ -5,7 +5,7 @@ max-line-length = 120
 max-args = 8
 max-positional-arguments = 8
 max-locals = 20
-max-attributes = 10
+max-attributes = 12
 min-public-methods = 0
 
 [MESSAGES CONTROL]

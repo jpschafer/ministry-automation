@@ -21,10 +21,21 @@ else
     log "network error; will try again tomorrow"
     exit 1
   fi
+  err_code=$(print -r -- "$body" | json error code)
   valid=$(print -r -- "$body" | json data is_valid)
   expires=$(print -r -- "$body" | json data expires_at)
-  if [[ $valid != True ]]; then
-    reason="Facebook user token is no longer valid"
+  if [[ -n $err_code ]]; then
+    # The check itself failed, so this says nothing about the token.
+    msg=$(print -r -- "$body" | json error message)
+    case $err_code in
+      4|17|32|613)
+        log "rate limited by Facebook (code $err_code: $msg); will try again tomorrow"
+        exit 1 ;;
+      *)
+        reason="Facebook check failed (code $err_code: $msg)" ;;
+    esac
+  elif [[ $valid != True ]]; then
+    reason="Facebook user token is no longer valid ($(print -r -- "$body" | json data error message))"
   elif (( ${expires:-0} == 0 )); then
     log "ok: token does not expire"
     exit 0
