@@ -97,7 +97,8 @@ def test_core_errors_are_raised():
 
 @pytest.mark.parametrize(
     "status,code,exc",
-    [(400, 190, AuthError), (403, 200, AuthError), (400, 613, RateLimitError), (500, 1, ApiError)],
+    [(400, 190, AuthError), (403, 200, AuthError), (400, 613, RateLimitError), (403, 4, RateLimitError),
+     (500, 1, ApiError)],
 )
 def test_graph_errors_are_typed(status, code, exc):
     graph = GraphClient(http_with(response(status, {"error": {"code": code, "message": "x"}})))

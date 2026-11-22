@@ -125,8 +125,9 @@ def check_response(resp, what):
     error = body.get("error", {}) if isinstance(body, dict) else {}
     code = error.get("code")
     message = f"Graph {what}: HTTP {resp.status_code} code={code}: {error.get('message', resp.text[:200])}"
-    if code in AUTH_ERROR_CODES or resp.status_code in (401, 403):
-        raise AuthError(message, status=resp.status_code, code=code)
+    # Rate limits come back as HTTP 403 too, so check the code before the status.
     if code in RATE_LIMIT_ERROR_CODES:
         raise RateLimitError(message, status=resp.status_code, code=code)
+    if code in AUTH_ERROR_CODES or resp.status_code in (401, 403):
+        raise AuthError(message, status=resp.status_code, code=code)
     raise ApiError(message, status=resp.status_code, code=code)
