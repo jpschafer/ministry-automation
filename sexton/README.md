@@ -33,6 +33,79 @@ Egress processes are plain stream copy (`-c copy -f flv`) from the channel's
 internal RTMP stream, the same source the Restreamer UI's own RTMP egresses use.
 Sexton never creates, changes or deletes a process whose id doesn't start with `sexton:`.
 
+### A service, start to finish
+
+One church's broadcast to one destination (its Page, or the profile). Both
+destinations follow this independently; nothing here is stored except the
+"push gone since" timer.
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> Idle
+    Idle --> Starting: push appears<br/>create LIVE_NOW video + egress
+    Starting --> Live: Facebook reports LIVE
+    Starting --> Starting: not LIVE after 120s<br/>alert, delete egress, try again
+    Live --> Live: egress missing (Sexton/Core restart)<br/>recreate it from the video's ingest URL
+    Live --> Starting: Facebook ended the video<br/>alert, delete egress, new video
+    Starting --> Grace: push gone
+    Live --> Grace: push gone
+    Grace --> Live: push back within 3 min<br/>(nothing was touched)
+    Grace --> Idle: push gone more than 3 min<br/>end video, delete egress
+    Idle: Idle (settled)
+    Idle: no Facebook calls at all
+    Starting: Starting
+    Starting: egress up, waiting for LIVE
+    Live: Live
+    Live: Facebook re-read every 30s
+    Grace: Grace
+    Grace: stream keeps its video, waits
+```
+
+### Every tick (10s)
+
+```mermaid
+flowchart TD
+    T([tick]) --> C{"Read Core:<br/>active pushes + sexton: egresses"}
+    C -- fails --> CA["alert: Core unreachable<br/>touch nothing"] --> W
+    C -- ok --> P["per church: pushing?<br/>start or clear the 'push gone since' timer"]
+    P --> D["for each church x destination<br/>(colfax:page, colfax:profile, levels:page, levels:profile)"]
+    D --> S{settled idle?}
+    S -- yes --> NEXT
+    S -- no --> B{"Facebook paused (rate limit)<br/>or this one backing off?"}
+    B -- yes --> NEXT
+    B -- no --> R["reconcile it<br/>(see below)"]
+    R -- ok --> OK["clear its backoff + alerts<br/>idle past grace: mark settled"] --> NEXT
+    R -- rate limited --> RL["pause ALL Facebook calls 15 min<br/>(running streams keep going), alert"] --> NEXT
+    R -- other error --> E["alert; retry this one in 10s, 20s, 40s ... max 5 min<br/>other destinations unaffected"] --> NEXT
+    NEXT[next destination] -.-> D
+    NEXT --> W["ping Healthchecks<br/>(/fail if anything failed)"] --> Z([sleep 10s])
+```
+
+### Reconciling one destination
+
+```mermaid
+flowchart TD
+    A{church pushing?} -- no --> G{"gone more than 3 min?"}
+    G -- no --> WAIT([wait: grace period])
+    G -- yes --> END["end this church's live video on the target<br/>delete its egress"] --> DONE([settled])
+
+    A -- yes --> V["read target's live videos<br/>(fresh while starting, else cached 30s)"]
+    V --> O{"live video owned by<br/>the OTHER church? (profile)"}
+    O -- "yes, other still pushing" --> CT([alert: contention, leave it alone])
+    O -- "yes, other stopped" --> HO["handoff: end their video<br/>delete their egress"] --> F
+    O -- no --> F{"someone else's live video<br/>(not titled by Sexton)?"}
+    F -- yes --> FA([alert: foreign video, don't stream there])
+    F -- no --> L{our video live?}
+    L -- no --> EG{our egress exists?}
+    EG -- no --> NEW(["create LIVE_NOW video<br/>+ egress to its stream URL"])
+    EG -- "yes, under 120s old" --> PEND([wait: Facebook catching up])
+    EG -- "yes, older" --> NL([alert: not live, delete egress<br/>next tick starts over])
+    L -- yes --> EX{our egress exists?}
+    EX -- no --> RE([recreate egress from<br/>the video's ingest URL])
+    EX -- yes --> STEADY(["steady: streaming<br/>alert if not LIVE after 120s"])
+```
+
 ## Alerts
 
 Via ntfy, deduplicated (once per problem, at most hourly re-sends, plus a
