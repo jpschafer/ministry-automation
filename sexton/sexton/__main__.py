@@ -15,6 +15,7 @@ from .facebook import GRAPH_API_VERSION, GraphClient
 from .http import Http
 from .log import configure_logging, event
 from .reconcile import Reconciler, describe
+from .youtube import YouTubeClient
 
 log = logging.getLogger("sexton")
 
@@ -43,7 +44,10 @@ def main(argv=None):
     http = Http(dry_run=args.dry_run)
     alerter = Alerter(http, config.ntfy_url, config.ntfy_token)
     healthcheck = Healthcheck(http, config.healthcheck_url)
-    reconciler = Reconciler(config, CoreClient(config.core, http), GraphClient(http), alerter)
+    platforms = {"facebook": GraphClient(http)}
+    if config.youtube:
+        platforms["youtube"] = YouTubeClient(http, config.youtube.client_id, config.youtube.client_secret)
+    reconciler = Reconciler(config, CoreClient(config.core, http), platforms, alerter)
 
     stop = threading.Event()
     for sig in (signal.SIGTERM, signal.SIGINT):
@@ -55,6 +59,7 @@ def main(argv=None):
         "start",
         dry_run=args.dry_run,
         graph_api=GRAPH_API_VERSION,
+        platforms=sorted(platforms),
         inputs=[i.name for i in config.inputs],
     )
     while not stop.is_set():

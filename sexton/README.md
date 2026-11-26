@@ -1,13 +1,17 @@
 # Sexton
 
-The sexton rings the bells. This one goes live on Facebook whenever OBS/Mevo
-starts pushing to a church's Restreamer channel, and ends the broadcast once the
-push has been gone for 3 minutes. YouTube egress stays managed in the Restreamer UI.
+The sexton rings the bells. This one goes live on Facebook (the church's Page and
+the personal profile) and YouTube whenever OBS/Mevo starts pushing to a church's
+Restreamer channel, and ends the broadcasts once the push has been gone for 3
+minutes. Every service becomes its own video, titled "<church title> – <date>".
+
+Sexton replaces the Restreamer UI's Facebook and YouTube egresses: delete those
+from the UI (keep the channels themselves), or both will stream at once.
 
 ## How it works
 
 Every ~10 seconds, for each input (church) and each of its destinations (its Page,
-plus the shared personal profile), Sexton reads:
+the shared personal profile, the shared YouTube channel), Sexton reads:
 
 - **pushing**: is the channel in Core's `GET /api/v3/rtmp`?
 - **live**: does the target have an active live video titled for this input?
@@ -21,8 +25,8 @@ and converges:
 | pushing, live, no egress | recreate the egress from the video's ingest URL (restart mid-service) |
 | pushing, egress < 120s old, not live yet | wait (no duplicate video) |
 | pushing, egress ≥ 120s old, not live | alert, delete egress so the next tick starts over |
-| pushing, the profile is live for the *other* church, which has stopped | end that video, then start this one |
-| pushing, the profile is live for the other church, which is *still pushing* | alert "contention", leave it alone |
+| pushing, a shared target (profile, YouTube) is live for the *other* church, which has stopped | end that video, then start this one |
+| pushing, a shared target is live for the other church, which is *still pushing* | alert "contention", leave it alone |
 | not pushing for > 180s | end this input's videos, delete its egresses |
 
 No files, no database. Facebook and Core are the source of truth. The only things
@@ -35,29 +39,29 @@ Sexton never creates, changes or deletes a process whose id doesn't start with `
 
 ### A service, start to finish
 
-One church's broadcast to one destination (its Page, or the profile). Both
-destinations follow this independently; nothing here is stored except the
+One church's broadcast to one destination (its Page, the profile, or YouTube).
+Each destination follows this independently; nothing here is stored except the
 "push gone since" timer.
 
 ```mermaid
 stateDiagram-v2
     direction LR
     [*] --> Idle
-    Idle --> Starting: push appears<br/>create LIVE_NOW video + egress
-    Starting --> Live: Facebook reports LIVE
+    Idle --> Starting: push appears<br/>create a live video + egress
+    Starting --> Live: platform reports LIVE
     Starting --> Starting: not LIVE after 120s<br/>alert, delete egress, try again
     Live --> Live: egress missing (Sexton/Core restart)<br/>recreate it from the video's ingest URL
-    Live --> Starting: Facebook ended the video<br/>alert, delete egress, new video
+    Live --> Starting: platform ended the video<br/>alert, delete egress, new video
     Starting --> Grace: push gone
     Live --> Grace: push gone
     Grace --> Live: push back within 3 min<br/>(nothing was touched)
     Grace --> Idle: push gone more than 3 min<br/>end video, delete egress
     Idle: Idle (settled)
-    Idle: no Facebook calls at all
+    Idle: no Facebook/YouTube calls at all
     Starting: Starting
     Starting: egress up, waiting for LIVE
     Live: Live
-    Live: Facebook re-read every 30s
+    Live: platform re-read every 30s
     Grace: Grace
     Grace: stream keeps its video, waits
 ```
@@ -69,14 +73,14 @@ flowchart TD
     T([tick]) --> C{"Read Core:<br/>active pushes + sexton: egresses"}
     C -- fails --> CA["alert: Core unreachable<br/>touch nothing"] --> W
     C -- ok --> P["per church: pushing?<br/>start or clear the 'push gone since' timer"]
-    P --> D["for each church x destination<br/>(colfax:page, colfax:profile, levels:page, levels:profile)"]
+    P --> D["for each church x destination<br/>(page, profile, youtube for colfax and levels)"]
     D --> S{settled idle?}
     S -- yes --> NEXT
-    S -- no --> B{"Facebook paused (rate limit)<br/>or this one backing off?"}
+    S -- no --> B{"its platform paused (rate limit)<br/>or this one backing off?"}
     B -- yes --> NEXT
     B -- no --> R["reconcile it<br/>(see below)"]
     R -- ok --> OK["clear its backoff + alerts<br/>idle past grace: mark settled"] --> NEXT
-    R -- rate limited --> RL["pause ALL Facebook calls 15 min<br/>(running streams keep going), alert"] --> NEXT
+    R -- rate limited --> RL["pause that platform's calls 15 min<br/>(running streams and the other platform keep going), alert"] --> NEXT
     R -- other error --> E["alert; retry this one in 10s, 20s, 40s ... max 5 min<br/>other destinations unaffected"] --> NEXT
     NEXT[next destination] -.-> D
     NEXT --> W["ping Healthchecks<br/>(/fail if anything failed)"] --> Z([sleep 10s])
@@ -91,15 +95,15 @@ flowchart TD
     G -- yes --> END["end this church's live video on the target<br/>delete its egress"] --> DONE([settled])
 
     A -- yes --> V["read target's live videos<br/>(fresh while starting, else cached 30s)"]
-    V --> O{"live video owned by<br/>the OTHER church? (profile)"}
+    V --> O{"live video owned by<br/>the OTHER church? (profile, YouTube)"}
     O -- "yes, other still pushing" --> CT([alert: contention, leave it alone])
     O -- "yes, other stopped" --> HO["handoff: end their video<br/>delete their egress"] --> F
     O -- no --> F{"someone else's live video<br/>(not titled by Sexton)?"}
     F -- yes --> FA([alert: foreign video, don't stream there])
     F -- no --> L{our video live?}
     L -- no --> EG{our egress exists?}
-    EG -- no --> NEW(["create LIVE_NOW video<br/>+ egress to its stream URL"])
-    EG -- "yes, under 120s old" --> PEND([wait: Facebook catching up])
+    EG -- no --> NEW(["create a dated live video<br/>+ egress to its stream URL"])
+    EG -- "yes, under 120s old" --> PEND([wait: platform catching up])
     EG -- "yes, older" --> NL([alert: not live, delete egress<br/>next tick starts over])
     L -- yes --> EX{our egress exists?}
     EX -- no --> RE([recreate egress from<br/>the video's ingest URL])
@@ -109,9 +113,10 @@ flowchart TD
 ## Alerts
 
 Via ntfy, deduplicated (once per problem, at most hourly re-sends, plus a
-"Recovered" note): Core unreachable, any create/end/egress failure, Facebook auth
-or permission errors, not LIVE within 2 minutes, an unknown live video occupying a
-target, profile contention, and unexpected exceptions. Healthchecks.io gets pinged
+"Recovered" note): Core unreachable, any create/end/egress failure, Facebook or
+YouTube auth/permission errors, rate limits (that platform pauses 15 min), not LIVE
+within 2 minutes, an unknown live video occupying a target, contention on a shared
+target, and unexpected exceptions. Healthchecks.io gets pinged
 every loop (`/fail` when a tick had errors), so a stopped Sexton is noticed too.
 
 ## Configuration
@@ -123,6 +128,8 @@ come only from env vars:
 |---|---|
 | `CORE_USERNAME`, `CORE_PASSWORD` | Restreamer Core API login (names set in config) |
 | `FB_TOKEN_*` | Page tokens / user token with `publish_video` (names set in config) |
+| `YT_CLIENT_ID`, `YT_CLIENT_SECRET` | Google OAuth client (only with a YouTube destination) |
+| `YT_REFRESH_TOKEN` | YouTube channel refresh token (see below; name set in config) |
 | `NTFY_URL` | Full topic URL, e.g. `https://ntfy.sh/your-topic` |
 | `NTFY_TOKEN` | Optional ntfy access token |
 | `HEALTHCHECK_URL` | Healthchecks.io ping URL |
@@ -143,6 +150,34 @@ on stdout. For Unraid, use `unraid-template.xml` (copy it to
 Template: sexton) or `docker-compose.example.yml`.
 
 Tests: `pip install -r requirements-dev.txt && pytest`
+
+## YouTube setup (one time)
+
+Sexton creates a broadcast per service (auto-start on, auto-stop off, so short
+drops don't split the video), bound to a reusable stream key titled `sexton` that
+it creates on the channel the first time. It never touches the channel's
+persistent "Stream now" broadcast. Each call costs 1 unit of the 10,000/day quota;
+a 2-hour service uses roughly 500.
+
+1. [Google Cloud console](https://console.cloud.google.com/): create a project and
+   enable **YouTube Data API v3**.
+2. **OAuth consent screen**: user type *Internal* if you have Google Workspace
+   (only your org can sign in), otherwise *External*; add the scope
+   `.../auth/youtube`; then **Publish app** so it's *In production*. A *Testing*
+   app's refresh tokens die after 7 days. Google verification is not needed for
+   your own use: you'll click past an "unverified app" warning once.
+3. **Credentials → Create OAuth client ID → Desktop app**. Put the ID and secret in
+   `YT_CLIENT_ID` / `YT_CLIENT_SECRET` and restart the container.
+4. Get the refresh token:
+   ```sh
+   docker exec -it sexton python -m sexton.youtube_auth
+   ```
+   Open the link, sign in as the channel's manager (pick the channel if it's a
+   Brand Account), approve, then paste the address of the page that fails to load
+   (`http://127.0.0.1:8765/?...`). It prints the channel name and
+   `YT_REFRESH_TOKEN`; set that and restart. It doesn't expire on a production
+   app; if it's ever revoked, Sexton alerts and you repeat this step.
+5. Delete the Restreamer UI's YouTube egresses.
 
 ## Renewing the Facebook user token
 

@@ -52,6 +52,14 @@ class Http:
             raise ApiError(f"{method} {redact(url)} failed: {type(err).__name__}: {err}") from err
 
 
+def json_body(resp):
+    """The response's JSON, or None if it has none or isn't JSON."""
+    try:
+        return resp.json()
+    except ValueError:
+        return None
+
+
 def redact(url):
     """Strips query strings so tokens and stream keys never reach the logs."""
     return url.split("?", 1)[0]

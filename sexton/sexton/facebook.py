@@ -13,7 +13,7 @@ import json
 import logging
 from dataclasses import dataclass
 
-from .http import ApiError, AuthError, RateLimitError
+from .http import ApiError, AuthError, RateLimitError, json_body
 from .log import event
 
 log = logging.getLogger("sexton.facebook")
@@ -115,10 +115,7 @@ class GraphClient:
 
 def check_response(resp, what):
     """Returns the JSON body of a Graph response, or raises a typed ApiError."""
-    try:
-        body = resp.json()
-    except ValueError:
-        body = None
+    body = json_body(resp)
     if resp.ok and isinstance(body, dict) and "error" not in body:
         return body
 

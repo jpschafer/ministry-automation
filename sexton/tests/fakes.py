@@ -11,6 +11,7 @@ from sexton.facebook import ACTIVE_STATUSES, LiveVideo
 from sexton.http import ApiError
 
 PROFILE = "me"
+YOUTUBE = "mine"
 
 
 class FakeClock:
@@ -68,6 +69,7 @@ class FakeGraph:
 
     def __init__(self, new_status="LIVE"):
         self.new_status = new_status
+        self.active_statuses = ACTIVE_STATUSES  # YouTube also lists pending ("ready") ones
         self.videos = {}  # id -> dict(target, title, status, url)
         self.calls = []
         self.fail = {}  # (method, target) -> exception
@@ -86,7 +88,7 @@ class FakeGraph:
         return [
             LiveVideo(vid, v["status"], v["title"])
             for vid, v in self.videos.items()
-            if v["target"] == target and v["status"] in ACTIVE_STATUSES
+            if v["target"] == target and v["status"] in self.active_statuses
         ]
 
     def create_live_video(self, target, token, title, description, privacy=None):
@@ -132,19 +134,23 @@ class FakeAlerter:
         return [k for k, _ in self.problems]
 
 
-def make_config():
-    """Two churches, each with its Page plus the shared profile."""
+def make_config(youtube=False):
+    """Two churches, each with its Page plus the shared profile (and, with
+    youtube=True, the shared YouTube channel)."""
 
     def church(name, title, page):
+        destinations = [
+            Destination("page", page, f"token-{page}"),
+            Destination("profile", PROFILE, "token-user"),
+        ]
+        if youtube:
+            destinations.append(Destination("youtube", YOUTUBE, "refresh-token", "public", "youtube"))
         return Input(
             name=name,
             rtmp_name=f"{name}-uuid.stream",
             title=title,
             description="",
-            destinations=(
-                Destination("page", page, f"token-{page}"),
-                Destination("profile", PROFILE, "token-user"),
-            ),
+            destinations=tuple(destinations),
         )
 
     return Config(
@@ -153,4 +159,4 @@ def make_config():
     )
 
 
-__all__ = ["ApiError", "FakeAlerter", "FakeClock", "FakeCore", "FakeGraph", "PROFILE", "make_config"]
+__all__ = ["ApiError", "FakeAlerter", "FakeClock", "FakeCore", "FakeGraph", "PROFILE", "YOUTUBE", "make_config"]

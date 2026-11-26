@@ -10,7 +10,7 @@
   <Privileged>false</Privileged>
   <Support>https://github.com/jpschafer/ministry-automation</Support>
   <Project>https://github.com/jpschafer/ministry-automation/tree/main/sexton</Project>
-  <Overview>Puts each church's Restreamer push live on Facebook (Page and profile) when the push starts, and ends the broadcast 3 minutes after it stops. Reads /config/config.yaml. Add --dry-run to Post Arguments for a test run.</Overview>
+  <Overview>Puts each church's Restreamer push live on Facebook (Page and profile) and YouTube when the push starts, and ends the broadcast 3 minutes after it stops. Reads /config/config.yaml. Add --dry-run to Post Arguments for a test run.</Overview>
   <Category>Tools: MediaServer:Video</Category>
   <ExtraParams>--restart unless-stopped --log-opt max-size=10m --log-opt max-file=3</ExtraParams>
   <PostArgs/>
@@ -20,6 +20,9 @@
   <Config Name="FB user token" Target="FB_TOKEN_USER" Default="" Mode="" Description="Long-lived user token with publish_video (renew about every 60 days)" Type="Variable" Display="always" Required="true" Mask="true"></Config>
   <Config Name="FB Colfax page token" Target="FB_TOKEN_COLFAX_PAGE" Default="" Mode="" Description="Colfax Page access token" Type="Variable" Display="always" Required="true" Mask="true"></Config>
   <Config Name="FB Levels page token" Target="FB_TOKEN_LEVELS_PAGE" Default="" Mode="" Description="Levels Page access token" Type="Variable" Display="always" Required="true" Mask="true"></Config>
+  <Config Name="YouTube client ID" Target="YT_CLIENT_ID" Default="" Mode="" Description="Google OAuth Desktop-app client ID (only with a youtube destination)" Type="Variable" Display="always" Required="false" Mask="false"></Config>
+  <Config Name="YouTube client secret" Target="YT_CLIENT_SECRET" Default="" Mode="" Description="Google OAuth client secret" Type="Variable" Display="always" Required="false" Mask="true"></Config>
+  <Config Name="YouTube refresh token" Target="YT_REFRESH_TOKEN" Default="" Mode="" Description="From: docker exec -it sexton python -m sexton.youtube_auth" Type="Variable" Display="always" Required="false" Mask="true"></Config>
   <Config Name="ntfy URL" Target="NTFY_URL" Default="" Mode="" Description="Full topic URL, e.g. https://ntfy.sh/your-random-topic" Type="Variable" Display="always" Required="false" Mask="false"></Config>
   <Config Name="ntfy token" Target="NTFY_TOKEN" Default="" Mode="" Description="Optional ntfy access token" Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
   <Config Name="Healthcheck URL" Target="HEALTHCHECK_URL" Default="" Mode="" Description="Healthchecks.io ping URL" Type="Variable" Display="always" Required="false" Mask="false"></Config>

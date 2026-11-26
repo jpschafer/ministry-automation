@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import dataclasses
+
 import pytest
 
 from sexton.http import ApiError, AuthError, RateLimitError
 from sexton.reconcile import Reconciler
-from tests.fakes import PROFILE, FakeAlerter, FakeClock, FakeCore, FakeGraph, make_config
+from tests.fakes import PROFILE, YOUTUBE, FakeAlerter, FakeClock, FakeCore, FakeGraph, make_config
 
 TICK = 10
 
@@ -14,13 +16,15 @@ TICK = 10
 class World:
     """A reconciler wired to fakes, with helpers to drive time."""
 
-    def __init__(self, new_status="LIVE"):
+    def __init__(self, new_status="LIVE", youtube=False):
         self.clock = FakeClock()
         self.core = FakeCore(self.clock)
         self.graph = FakeGraph(new_status)
+        self.youtube = FakeGraph(new_status)
         self.alerter = FakeAlerter()
-        self.config = make_config()
-        self.brain = Reconciler(self.config, self.core, self.graph, self.alerter, self.clock)
+        self.config = make_config(youtube)
+        platforms = {"facebook": self.graph, "youtube": self.youtube}
+        self.brain = Reconciler(self.config, self.core, platforms, self.alerter, self.clock)
 
     def push(self, name, on=True):
         """Starts or stops an input's push."""
@@ -142,7 +146,7 @@ def test_profile_handoff_between_churches():
     w.run()
     assert w.graph.videos[colfax_profile[0]]["status"] == "VOD"
     profile_live = w.graph.live(PROFILE)
-    assert len(profile_live) == 1 and w.graph.videos[profile_live[0]]["title"] == "Levels Worship"
+    assert len(profile_live) == 1 and w.graph.videos[profile_live[0]]["title"].startswith("Levels Worship – ")
     assert "sexton:colfax:profile" not in w.core.egresses()
     assert w.core.egresses()["sexton:levels:profile"].output == f"rtmps://fb/{profile_live[0]}"
     # Colfax's Page is untouched by the handoff; it ends after its own grace.
@@ -161,8 +165,8 @@ def test_profile_contention_when_both_push_does_not_flap():
     w.push("levels")
     w.run(60)
     assert len(w.graph.live(PROFILE)) == 1
-    assert w.graph.videos[w.graph.live(PROFILE)[0]]["title"] == "Colfax Worship"
-    assert f"{PROFILE}:contention" in w.alerter.active
+    assert w.graph.videos[w.graph.live(PROFILE)[0]]["title"].startswith("Colfax Worship – ")
+    assert f"facebook:{PROFILE}:contention" in w.alerter.active
     assert len(w.graph.live("levels-page")) == 1
 
 
@@ -293,3 +297,87 @@ def test_contention_reads_facebook_at_poll_rate_not_every_tick():
     w.run(600)
     reads = len([c for c in w.graph.calls if c == ("list", PROFILE)]) - reads_before
     assert reads <= 600 / 30 + 2
+
+
+def test_new_videos_get_a_dated_title():
+    w = World()
+    w.push("colfax")
+    w.run()
+    [vid] = w.graph.live("colfax-page")
+    assert w.graph.videos[vid]["title"] == "Colfax Worship – Jan 12, 1970"  # FakeClock's epoch, local time
+
+
+def test_plain_titles_when_title_date_is_off():
+    w = World()
+    w.config = dataclasses.replace(w.config, title_date=None)
+    w.brain = Reconciler(w.config, w.core, w.brain.platforms, w.alerter, w.clock)
+    w.push("colfax")
+    w.run()
+    [vid] = w.graph.live("colfax-page")
+    assert w.graph.videos[vid]["title"] == "Colfax Worship"
+
+
+def test_youtube_goes_live_alongside_facebook_and_ends_after_grace():
+    w = World(youtube=True)
+    w.push("colfax")
+    assert w.run()
+    assert len(w.youtube.live(YOUTUBE)) == 1
+    assert "sexton:colfax:youtube" in w.egress_ids()
+    assert w.graph.live(YOUTUBE) == []  # each platform only gets its own calls
+    w.push("colfax", on=False)
+    w.run(200)
+    assert w.youtube.live(YOUTUBE) == []
+    assert w.egress_ids() == []
+
+
+def test_youtube_channel_is_handed_off_between_churches():
+    w = World(youtube=True)
+    w.push("colfax")
+    w.run(60)
+    w.push("colfax", on=False)
+    w.push("levels")
+    w.run()
+    [vid] = w.youtube.live(YOUTUBE)
+    assert w.youtube.videos[vid]["title"].startswith("Levels Worship")
+    assert "sexton:colfax:youtube" not in w.core.egresses()
+
+
+def test_youtube_rate_limit_does_not_pause_facebook():
+    w = World(youtube=True)
+    w.youtube.fail[("create", YOUTUBE)] = RateLimitError("quotaExceeded")
+    w.push("colfax")
+    w.run()
+    assert "youtube:rate_limit" in w.alerter.active
+    assert "facebook:rate_limit" not in w.alerter.active
+    assert len(w.graph.live("colfax-page")) == 1
+    assert len(w.graph.live(PROFILE)) == 1
+    del w.youtube.fail[("create", YOUTUBE)]
+    before = len(w.youtube.calls)
+    w.run(890)
+    assert len(w.youtube.calls) == before
+    w.run(30)
+    assert len(w.youtube.live(YOUTUBE)) == 1
+    assert "youtube:rate_limit" not in w.alerter.active
+
+
+def test_pending_youtube_broadcast_is_reused_not_duplicated():
+    """YouTube lists a broadcast waiting for its first frames as pending; after a
+    restart that one gets its egress back instead of a second broadcast."""
+    w = World(youtube=True)
+    pending = w.youtube.add(YOUTUBE, "Colfax Worship – Jan 12, 1970", status="ready")
+    w.youtube.active_statuses = ("LIVE", "ready")
+    w.push("colfax")
+    w.run()
+    assert w.creates(YOUTUBE) == [] and ("create", YOUTUBE) not in w.youtube.calls
+    assert ("ingest_url", pending) in w.youtube.calls
+    assert "sexton:colfax:youtube" in w.egress_ids()
+
+
+def test_someone_elses_scheduled_youtube_broadcast_does_not_block():
+    w = World(youtube=True)
+    w.youtube.active_statuses = ("LIVE", "ready")
+    w.youtube.add(YOUTUBE, "Christmas Cantata", status="ready")
+    w.push("colfax")
+    w.run()
+    assert len(w.youtube.live(YOUTUBE)) == 1
+    assert "colfax:youtube:foreign" not in w.alerter.active
