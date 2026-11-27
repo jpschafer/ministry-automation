@@ -1,3 +1,5 @@
+<img src="logo.svg" alt="" width="96" align="right">
+
 # Sexton
 
 The sexton rings the bells. This one goes live on Facebook (the church's Page and

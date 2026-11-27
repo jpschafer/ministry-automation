@@ -10,6 +10,7 @@
   <Privileged>false</Privileged>
   <Support>https://github.com/jpschafer/ministry-automation</Support>
   <Project>https://github.com/jpschafer/ministry-automation/tree/main/sexton</Project>
+  <Icon>https://raw.githubusercontent.com/jpschafer/ministry-automation/main/sexton/logo.png</Icon>
   <Overview>Puts each church's Restreamer push live on Facebook (Page and profile) and YouTube when the push starts, and ends the broadcast 3 minutes after it stops. Reads /config/config.yaml. Add --dry-run to Post Arguments for a test run.</Overview>
   <Category>Tools: MediaServer:Video</Category>
   <ExtraParams>--restart unless-stopped --log-opt max-size=10m --log-opt max-file=3</ExtraParams>

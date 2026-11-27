@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="t">
+  <title id="t">Sexton</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#22325a"/>
+      <stop offset="1" stop-color="#141d36"/>
+    </linearGradient>
+    <linearGradient id="bell" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7cf6b"/>
+      <stop offset="1" stop-color="#d9961c"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="104" fill="url(#bg)"/>
+
+  <!-- broadcast waves -->
+  <g fill="none" stroke="#f2c25a" stroke-linecap="round">
+    <path d="M128 160 A148 148 0 0 0 128 300" stroke-width="22" opacity="0.9"/>
+    <path d="M384 160 A148 148 0 0 1 384 300" stroke-width="22" opacity="0.9"/>
+    <path d="M84 128 A200 200 0 0 0 84 332" stroke-width="22" opacity="0.5"/>
+    <path d="M428 128 A200 200 0 0 1 428 332" stroke-width="22" opacity="0.5"/>
+  </g>
+
+  <!-- bell: headstock, flared church-bell body, lip -->
+  <rect x="226" y="96" width="60" height="22" rx="8" fill="url(#bell)"/>
+  <path d="M238 118 L238 138 M274 118 L274 138" stroke="#f0bb4f" stroke-width="12"/>
+  <path fill="url(#bell)" d="M256 132
+    C212 132 194 158 192 206
+    L188 280
+    C186 326 164 350 128 366
+    L384 366
+    C348 350 326 326 324 280
+    L320 206
+    C318 158 300 132 256 132 Z"/>
+  <rect x="116" y="360" width="280" height="26" rx="13" fill="url(#bell)"/>
+  <!-- clapper: the live dot -->
+  <circle cx="256" cy="414" r="24" fill="#ef4444"/>
+  <circle cx="256" cy="414" r="24" fill="none" stroke="#fca5a5" stroke-width="4" opacity="0.6"/>
+  <!-- highlight -->
+  <path d="M220 172 C210 190 208 214 207 240 L204 300" fill="none" stroke="#fff3cf"
+        stroke-width="12" stroke-linecap="round" opacity="0.55"/>
+</svg>
