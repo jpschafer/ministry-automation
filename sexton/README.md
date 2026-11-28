@@ -182,6 +182,14 @@ docker run --rm --user root --entrypoint python \
 docker exec sexton python -m sexton.readings show /config/readings 2026-06-21
 ```
 
+To prefill every blank day from the [Vanderbilt Divinity Library RCL
+feed](https://lectionary.library.vanderbilt.edu/subscribe/) (three church years at
+a time), run `import-rcl` the same way as `init`. It fills only days that are still
+completely blank. The first reading drops the psalm, summer Propers list both
+tracks as "semicontinuous or complementary" (delete the one you don't use), and
+the Easter season's first reading is labelled "First Reading" since it's Acts.
+Re-run it in a later cycle to fill days the current three years don't have.
+
 ## YouTube setup (one time)
 
 Sexton creates a broadcast per service (auto-start on, auto-stop off, so short

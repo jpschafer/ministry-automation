@@ -7,7 +7,7 @@ import json
 from datetime import date
 
 from sexton.lectionary import all_days, day_name
-from sexton.readings import block, init, readings_for
+from sexton.readings import block, import_rcl, init, parse_ics, readings_for
 from tests.test_reconcile import World
 
 
@@ -61,3 +61,54 @@ def test_stream_description_gets_the_days_readings(tmp_path):
     [vid] = w.graph.live("colfax-page")
     assert w.graph.videos[vid]["description"] == (
         "Readings\nOld Testament: Genesis 1:1-5\nNew Testament: Acts 19:1-7")
+
+
+FEED = (
+    "BEGIN:VCALENDAR\r\n"
+    "BEGIN:VEVENT\r\nSUMMARY:Proper 7 (12) (Year B)\r\n"
+    "DESCRIPTION:1 Samuel 17:(1a\\, 4-11\\, 19-23)\\, 32-49 and  Psalm 9:9-20 or 1 Sam"
+    "uel 17:57-18:5\\, 18:10-1\r\n"
+    " 6 and  Psalm 133\\nJob 38:1-11 and  Psalm 107:1-3\\, 23-32\\n2 Corinthians 6:1-13\\nMark 4:35-41\\nhttps://x\r\n"
+    "END:VEVENT\r\n"
+    "BEGIN:VEVENT\r\nSUMMARY:First Sunday of Advent (Year B)\r\n"
+    "DESCRIPTION:Isaiah 64:1-9\\nPsalm 80:1-7\\, 17-19\\n1 Corinthians 1:3-9\\n"
+    "Mark 13:24-37\\nhttps://x\r\nEND:VEVENT\r\n"
+    "BEGIN:VEVENT\r\nSUMMARY:Third Sunday of Easter (Year B)\r\n"
+    "DESCRIPTION:* Acts 3:12-19\\nPsalm 4\\n1 John 3:1-7\\nLuke 24:36b-48\\nhttps://x\r\nEND:VEVENT\r\n"
+    "BEGIN:VEVENT\r\nSUMMARY:Reign of Christ - Proper 29 (34) (Year A)\r\n"
+    "DESCRIPTION:Ezekiel 34:11-16\\, 20-24 and  Psalm 100\\nEzekiel 34:11-16\\, 20-24 and  Psalm 95:1-7a\\n"
+    "Ephesians 1:15-23\\nMatthew 25:31-46\\nhttps://x\r\nEND:VEVENT\r\n"
+    "BEGIN:VEVENT\r\nSUMMARY:Liturgy of the Palms (Year A)\r\n"
+    "DESCRIPTION:Psalm 118:1-2\\, 19-29\\nMatthew 21:1-11\\nhttps://x\r\nEND:VEVENT\r\n"
+    "BEGIN:VEVENT\r\nSUMMARY:Liturgy of the Passion (Year A)\r\n"
+    "DESCRIPTION:Isaiah 50:4-9a\\nPsalm 31:9-16\\nPhilippians 2:5-11\\nMatthew 27:11-54\\nhttps://x\r\nEND:VEVENT\r\n"
+    "BEGIN:VEVENT\r\nSUMMARY:Easter Vigil (Year A)\r\n"
+    "DESCRIPTION:See the Easter Vigil page for full list of readings: https://x\r\nEND:VEVENT\r\n"
+    "END:VCALENDAR\r\n"
+)
+
+
+def test_rcl_feed_is_reduced_to_first_reading_and_gospel():
+    days = parse_ics(FEED)
+    assert days[("Year B", "Proper 7")] == {
+        "Old Testament": "1 Samuel 17:(1a, 4-11, 19-23), 32-49 or 1 Samuel 17:57-18:5, 18:10-16 or Job 38:1-11",
+        "Gospel": "Mark 4:35-41"}
+    assert days[("Year B", "First Sunday of Advent")] == {"Old Testament": "Isaiah 64:1-9", "Gospel": "Mark 13:24-37"}
+    assert days[("Year B", "Third Sunday of Easter")] == {"First Reading": "Acts 3:12-19", "Gospel": "Luke 24:36b-48"}
+    assert days[("Year A", "Christ the King (Proper 29)")]["Old Testament"] == "Ezekiel 34:11-16, 20-24"
+    assert days[("Year A", "Palm/Passion Sunday")] == {
+        "Old Testament": "Isaiah 50:4-9a", "Gospel": "Matthew 21:1-11 (Palms) or Matthew 27:11-54 (Passion)"}
+    assert not any("Vigil" in name for _, name in days)
+
+
+def test_import_fills_blank_days_only(tmp_path):
+    feed = tmp_path / "weekly.ics"
+    feed.write_text(FEED)
+    folder = tmp_path / "readings"
+    folder.mkdir()
+    write(folder, "b", {"Proper 7": {"Old Testament": "Job 38:1-11", "Gospel": ""}})
+    import_rcl(str(folder), str(feed))
+    b = json.loads((folder / "year-b.json").read_text())
+    assert b["Proper 7"] == {"Old Testament": "Job 38:1-11", "Gospel": ""}  # yours: untouched
+    assert b["First Sunday of Advent"]["Gospel"] == "Mark 13:24-37"
+    assert b["Proper 8"] == {"Old Testament": "", "Gospel": ""}  # not in the feed: still blank
