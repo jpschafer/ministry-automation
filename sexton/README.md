@@ -167,7 +167,7 @@ Readings go in `readings/year-a.json`, `year-b.json` and `year-c.json` next to
 `config.yaml`, keyed by those day names, with whatever labels you like:
 
 ```json
-"Proper 7": { "Old Testament": "Jeremiah 20:7-13", "New Testament": "Romans 6:1b-11" }
+"Proper 7": { "Old Testament": "Jeremiah 20:7-13", "Gospel": "Matthew 10:24-39" }
 ```
 
 Filled-in entries are added to the stream description under "Readings"; blank or

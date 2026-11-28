@@ -3,7 +3,7 @@
 One JSON file per lectionary year in the readings folder (next to config.yaml):
 
   readings/year-a.json   {"Proper 7": {"Old Testament": "Jeremiah 20:7-13",
-  readings/year-b.json                 "New Testament": "Romans 6:1b-11"}, ...}
+  readings/year-b.json                 "Gospel": "Matthew 10:24-39"}, ...}
   readings/year-c.json
 
 Keys are the day names Sexton puts in titles; labels and their order are yours.
@@ -28,7 +28,7 @@ from .lectionary import all_days, describe
 from .log import event
 
 log = logging.getLogger("sexton.readings")
-LABELS = ("Old Testament", "New Testament")
+LABELS = ("Old Testament", "Gospel")
 
 
 def path_for(folder, year):

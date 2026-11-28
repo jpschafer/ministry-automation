@@ -39,7 +39,7 @@ def test_init_creates_every_day_and_never_overwrites(tmp_path):
     a = json.loads((tmp_path / "year-a.json").read_text())
     assert a["Proper 7"]["Old Testament"] == "Genesis 21:8-21"  # kept
     assert "Homecoming" in a  # extras kept
-    assert a["First Sunday of Advent"] == {"Old Testament": "", "New Testament": ""}
+    assert a["First Sunday of Advent"] == {"Old Testament": "", "Gospel": ""}
     for letter in "bc":
         assert list(json.loads((tmp_path / f"year-{letter}.json").read_text())) == all_days()
 
