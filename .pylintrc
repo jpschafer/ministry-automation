@@ -1,0 +1,11 @@
+# Lint settings for the scripts outside sexton/ (sexton has its own .pylintrc).
+[FORMAT]
+max-line-length = 120
+
+[MESSAGES CONTROL]
+# f-strings in log calls are a deliberate choice in these small scripts.
+disable = logging-fstring-interpolation
+
+[TYPECHECK]
+# googleapiclient builds channels(), playlistItems() etc. at runtime.
+ignored-classes = Resource

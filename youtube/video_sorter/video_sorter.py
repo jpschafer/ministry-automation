@@ -29,7 +29,7 @@ from googleapiclient.errors import HttpError
 
 # youtube_videos.py lives in the sibling ../api folder, so put that on the path.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "api"))
-from youtube_videos import get_my_videos, get_service  # noqa: E402
+from youtube_videos import get_my_videos, get_service  # noqa: E402  # pylint: disable=wrong-import-position
 
 # Playlist title on YouTube -> keywords (case-insensitive) that, when found in a
 # VIDEO title, route that video to the playlist. Adjust to your naming scheme.
@@ -188,6 +188,7 @@ def plan_playlist(existing, new_videos):
 # --------------------------------------------------------------------------- #
 
 def apply_plan(youtube, playlist_id, moves, inserts):
+    """Moves existing playlist items and inserts new ones at their positions."""
     for item, pos in moves:
         youtube.playlistItems().update(
             part="snippet",
@@ -215,7 +216,8 @@ def apply_plan(youtube, playlist_id, moves, inserts):
 # Main
 # --------------------------------------------------------------------------- #
 
-def main():
+def main():  # pylint: disable=too-many-locals,too-many-branches
+    """Plans (and with --apply, makes) the playlist changes."""
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")  # titles may contain non-ASCII
 

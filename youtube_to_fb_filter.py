@@ -29,12 +29,11 @@ def post_video_to_page(data):
         return publish_facebook_post(
             video_title, video_url, data["page_token_1"], page_url_1
         )
-    elif re.match(pattern_2, video_title):
+    if re.match(pattern_2, video_title):
         return publish_facebook_post(
             video_title, video_url, data["page_token_2"], page_url_2
         )
-    else:
-        return None  # Nothing to Output
+    return None  # Nothing to Output
 
 
 def publish_facebook_post(text, url, fb_page_token, page_url):
@@ -75,9 +74,9 @@ def main(data):
     response = post_video_to_page(data)
 
     # This Variable Gets Accessed by Zapier I believe?
-    output = {"response": response}  # type: ignore
+    output = {"response": response}  # type: ignore  # pylint: disable=unused-variable
 
 
 # So I don't have to ignore a zapier injected variable everywhere in linting
-if input_data:  # type: ignore
-    main(input_data)  # type: ignore
+if input_data:  # type: ignore  # pylint: disable=undefined-variable
+    main(input_data)  # type: ignore  # pylint: disable=undefined-variable

@@ -7,7 +7,7 @@ import re
 import requests
 
 
-def get_pages(user_token):
+def get_pages(user_token):  # pylint: disable=unused-argument  # see the commented-out lookup below
     """Retrieves the Pages and their Access Tokens"""
     # This code Is "Better" But requires too much time for the Zapier 1 second time limit due to latency.
     # url = f'https://graph.facebook.com/v19.0/me/accounts?access_token={user_token}'
@@ -29,7 +29,7 @@ def process_text_with_regex(text):
     It looks for a word boundary, followed by a capital letter 'Y', followed by a colon,
     followed by a space, and then captures one or more word characters as a group"""
 
-    pattern = r"(?:\** *)((?:[\d ]*[a-zA-Z]+(?: \d*:\d*)?)(?:(?: - )| | (?:-))?(?:(?:(?:\d* )?[a-zA-Z]+ )?\d*(?:[:-]+\d*)?))(?: +)(?:((?:[\d ]*[a-zA-Z]+(?: \d*:\d*)?)(?:(?: - )| |(?:-))?(?:(?:(?:\d* )?[a-zA-Z]+ )?\d*(?:[:-]+\d*)?))(?:(?:(?: +)or(?:[\d ]*[a-zA-Z]+(?: \d*:\d*)?)(?:(?: - )| |(?:-))?(?:(?:(?:\d* )?[a-zA-Z]+ )?\d*(?:[:-]+\d*)?))?))(?: +)((?:[\d ]*[a-zA-Z]+(?: \d*:\d*)?)(?:(?: - )| |(?:-))?(?:(?:(?:\d* )?[a-zA-Z]+ )?\d*(?:[:-]+\d*)?))(?: +)((?:[\d ]*[a-zA-Z]+(?: \d*:\d*)?)(?:(?: - )| |(?:-))?(?:(?:(?:\d* )?[a-zA-Z]+ )?\d*(?:[:-]+\d*)?))(?: +)(https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&//=]*))"
+    pattern = r"(?:\** *)((?:[\d ]*[a-zA-Z]+(?: \d*:\d*)?)(?:(?: - )| | (?:-))?(?:(?:(?:\d* )?[a-zA-Z]+ )?\d*(?:[:-]+\d*)?))(?: +)(?:((?:[\d ]*[a-zA-Z]+(?: \d*:\d*)?)(?:(?: - )| |(?:-))?(?:(?:(?:\d* )?[a-zA-Z]+ )?\d*(?:[:-]+\d*)?))(?:(?:(?: +)or(?:[\d ]*[a-zA-Z]+(?: \d*:\d*)?)(?:(?: - )| |(?:-))?(?:(?:(?:\d* )?[a-zA-Z]+ )?\d*(?:[:-]+\d*)?))?))(?: +)((?:[\d ]*[a-zA-Z]+(?: \d*:\d*)?)(?:(?: - )| |(?:-))?(?:(?:(?:\d* )?[a-zA-Z]+ )?\d*(?:[:-]+\d*)?))(?: +)((?:[\d ]*[a-zA-Z]+(?: \d*:\d*)?)(?:(?: - )| |(?:-))?(?:(?:(?:\d* )?[a-zA-Z]+ )?\d*(?:[:-]+\d*)?))(?: +)(https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&//=]*))"  # pylint: disable=line-too-long
 
     # Using the re.search function to find the first occurrence of the pattern in the text
     text = text.replace("\n", " ").replace("\r", "")
@@ -65,8 +65,10 @@ def publish_facebook_post(input_data, readings, access_token, url, page_url):
         resp = requests.post(
             page_url, headers=headers, data=json.dumps(data), timeout=(None, 0.3)
         )
+        return resp.status_code
     except requests.exceptions.Timeout:
         print("Timeout occurred")
+        return None  # sent, but Zapier's time limit doesn't allow waiting for the answer
 
     # Define the output as a dictionary with the key "response"
     # and the value as the response from the API
@@ -75,8 +77,8 @@ def publish_facebook_post(input_data, readings, access_token, url, page_url):
 
 
 def main(data):
-    # Getting the text from the input data
-    text = input_data["text"]
+    """Pulls the readings out of the calendar text and posts them to each Page."""
+    text = data["text"]
 
     # Calling the function to process the text with the regular expression
     # print(text)
@@ -85,21 +87,19 @@ def main(data):
     # Printing the processed text
     # print(readings, url)
 
-    fb_pages = get_pages(input_data["system_user_token"])
+    fb_pages = get_pages(data["system_user_token"])
 
     responses = []
     for page in fb_pages:
         page_url = f"https://graph.facebook.com/v19.0/{page['id']}/feed"
         response = publish_facebook_post(
-            input_data, readings, page["access_token"], url, page_url
+            data, readings, page["access_token"], url, page_url
         )
-        responses.append(fb_pages)
+        responses.append(response)
 
-    output = {"readings": readings, "url": url, "responses": responses}
+    output = {"readings": readings, "url": url, "responses": responses}  # pylint: disable=unused-variable
 
 
-
-if (input_data) {
-    
-    } # type: ignore
- 
+# Zapier injects input_data and reads output; there's no import for either.
+if input_data:  # type: ignore  # pylint: disable=undefined-variable
+    main(input_data)  # type: ignore  # pylint: disable=undefined-variable

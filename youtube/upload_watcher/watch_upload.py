@@ -1,4 +1,4 @@
-"""
+r"""
 Watches a directory for new video files and uploads them to YouTube,
 but only if the filename starts with an approved prefix (so it doubles
 as a "has this been titled correctly" gate).
@@ -48,6 +48,7 @@ log = logging.getLogger("filewatch-upload")
 
 
 def get_youtube_service():
+    """Authenticated YouTube client; logs in through the browser the first time."""
     creds = None
     if os.path.exists(TOKEN_FILE):
         with open(TOKEN_FILE, "rb") as f:
@@ -86,6 +87,7 @@ def wait_until_stable(path: Path, checks=STABLE_CHECKS_REQUIRED, interval=STABLE
 
 
 def upload_video(youtube, path: Path, title: str):
+    """Uploads path as an unlisted video titled title; returns its id."""
     body = {
         "snippet": {"title": title, "description": "", "categoryId": "22"},
         "status": {"privacyStatus": "unlisted"},  # change to "private" or "public" as needed
@@ -103,18 +105,23 @@ def upload_video(youtube, path: Path, title: str):
 
 
 class Handler(FileSystemEventHandler):
+    """Uploads video files as they appear in (or are moved into) the watch folder."""
+
     def __init__(self, youtube):
         self.youtube = youtube
 
     def on_created(self, event):
+        """A file was written into the folder."""
         if not event.is_directory:
             self.process(Path(event.src_path))
 
     def on_moved(self, event):
+        """A file was renamed or moved into the folder."""
         if not event.is_directory:
             self.process(Path(event.dest_path))
 
     def process(self, path: Path):
+        """Uploads path if it's a correctly named video, then files it under uploaded/."""
         if not path.exists() or path.suffix.lower() not in VIDEO_EXTENSIONS:
             return
 
@@ -137,7 +144,7 @@ class Handler(FileSystemEventHandler):
             UPLOADED_DIR.mkdir(exist_ok=True)
             path.rename(UPLOADED_DIR / path.name)
             log.info(f"Moved '{path.name}' into uploaded/")
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught  # keep watching after any failure
             log.error(f"Upload failed for '{path.name}': {e}")
 
 
@@ -149,6 +156,7 @@ def scan_existing(handler: Handler):
 
 
 def main():
+    """Uploads what's already there, then watches for new files until interrupted."""
     WATCH_DIR.mkdir(parents=True, exist_ok=True)
     youtube = get_youtube_service()
     handler = Handler(youtube)
