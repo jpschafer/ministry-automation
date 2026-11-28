@@ -9,9 +9,10 @@ tick_seconds: 10
 grace_seconds: 180      # push must be gone this long before the broadcast is ended
 verify_seconds: 120     # alert if not LIVE this long after the egress starts
 poll_seconds: 30        # how often to re-read Facebook/YouTube once a stream is steady
-# New videos are titled "<title> – <date>"; strftime format in the container's TZ.
-# Set to "" for plain titles.
-title_date: "%b %-d, %Y"
+# How new videos are titled, e.g. "Colfax UMC Worship – Proper 7, Year A – Jun 21, 2026".
+# {day} is the lectionary day (RCL), {year} "Year A/B/C", {date} strftime after the
+# colon, in the container's TZ. Must be "{title}" alone or start with "{title} – ".
+title_format: "{title} – {day}, {year} – {date:%b %-d, %Y}"
 
 # Only needed with a youtube destination: the Google OAuth client (Desktop app).
 youtube:

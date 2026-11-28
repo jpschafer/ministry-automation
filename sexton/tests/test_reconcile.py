@@ -304,12 +304,13 @@ def test_new_videos_get_a_dated_title():
     w.push("colfax")
     w.run()
     [vid] = w.graph.live("colfax-page")
-    assert w.graph.videos[vid]["title"] == "Colfax Worship – Jan 12, 1970"  # FakeClock's epoch, local time
+    # FakeClock's time is Monday Jan 12, 1970: nearest Sunday is the Baptism of the Lord.
+    assert w.graph.videos[vid]["title"] == "Colfax Worship – Baptism of the Lord, Year B – Jan 12, 1970"
 
 
-def test_plain_titles_when_title_date_is_off():
+def test_plain_titles_when_title_format_is_just_the_title():
     w = World()
-    w.config = dataclasses.replace(w.config, title_date=None)
+    w.config = dataclasses.replace(w.config, title_format="{title}")
     w.brain = Reconciler(w.config, w.core, w.brain.platforms, w.alerter, w.clock)
     w.push("colfax")
     w.run()
@@ -364,7 +365,7 @@ def test_pending_youtube_broadcast_is_reused_not_duplicated():
     """YouTube lists a broadcast waiting for its first frames as pending; after a
     restart that one gets its egress back instead of a second broadcast."""
     w = World(youtube=True)
-    pending = w.youtube.add(YOUTUBE, "Colfax Worship – Jan 12, 1970", status="ready")
+    pending = w.youtube.add(YOUTUBE, "Colfax Worship – Proper 7, Year A – Jun 21, 2026", status="ready")
     w.youtube.active_statuses = ("LIVE", "ready")
     w.push("colfax")
     w.run()

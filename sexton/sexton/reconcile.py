@@ -21,8 +21,10 @@ from __future__ import annotations
 
 import logging
 import time
+from datetime import datetime
 
 from .core import Egress, egress_id
+from .lectionary import describe as lectionary
 from .http import RateLimitError
 from .log import event
 
@@ -247,10 +249,10 @@ class Reconciler:
         return since is not None and now - since > self.config.grace_seconds
 
     def _title(self, inp, now):
-        """The title for a new video: "<title> – <date>" (or just the title)."""
-        if not self.config.title_date:
-            return inp.title
-        return f"{inp.title}{TITLE_DATE_SEPARATOR}{time.strftime(self.config.title_date, time.localtime(now))}"
+        """The title for a new video, e.g. "<title> – Proper 7, Year A – Jun 21, 2026"."""
+        when = datetime.fromtimestamp(now)  # local time (the container's TZ)
+        day, year = lectionary(when)
+        return self.config.title_format.format(title=inp.title, day=day, year=year, date=when)[:100]
 
     def _owner(self, title):
         """The input a video belongs to, by its title (plain or dated), or None."""

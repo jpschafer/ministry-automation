@@ -6,14 +6,19 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass, field
+from datetime import datetime
 
 import yaml
 
 NAME_RE = re.compile(r"[a-z0-9_-]+")
 PLATFORMS = ("facebook", "youtube")
 YOUTUBE_PRIVACY = ("public", "unlisted", "private")
-# Appended to each input's title as "<title> – <date>"; strftime format, local time (TZ).
-DEFAULT_TITLE_DATE = "%b %-d, %Y"
+# How new videos are titled. Fields: {title} (the input's), {day} (lectionary day,
+# e.g. "Proper 7"), {year} ("Year A"), {date} (a datetime; strftime after the colon).
+# Must be "{title}" or start with "{title} – ": that prefix is how Sexton
+# recognises its own videos on a shared target.
+DEFAULT_TITLE_FORMAT = "{title} – {day}, {year} – {date:%b %-d, %Y}"
+TITLE_PREFIX = "{title} – "
 
 
 class ConfigError(Exception):
@@ -76,7 +81,7 @@ class Config:
     grace_seconds: float = 180
     verify_seconds: float = 120
     poll_seconds: float = 30
-    title_date: str | None = DEFAULT_TITLE_DATE
+    title_format: str = DEFAULT_TITLE_FORMAT
     youtube: YouTubeConfig | None = None
     ntfy_url: str | None = None
     ntfy_token: str | None = field(default=None, repr=False)
@@ -170,12 +175,28 @@ def load_config(path):
         verify_seconds=float(raw.get("verify_seconds", 120)),
         # fb_poll_seconds is the pre-YouTube name for the same setting.
         poll_seconds=float(raw.get("poll_seconds", raw.get("fb_poll_seconds", 30))),
-        title_date=raw.get("title_date", DEFAULT_TITLE_DATE) or None,
+        title_format=_title_format(raw),
         youtube=youtube,
         ntfy_url=_env("NTFY_URL", required=False),
         ntfy_token=_env("NTFY_TOKEN", required=False),
         healthcheck_url=_env("HEALTHCHECK_URL", required=False),
     )
+
+
+def _title_format(raw):
+    if "title_format" in raw:
+        fmt = raw["title_format"] or "{title}"
+    elif "title_date" in raw:  # the older, date-only setting
+        fmt = f"{TITLE_PREFIX}{{date:{raw['title_date']}}}" if raw["title_date"] else "{title}"
+    else:
+        fmt = DEFAULT_TITLE_FORMAT
+    if fmt != "{title}" and not fmt.startswith(TITLE_PREFIX):
+        raise ConfigError(f'title_format must be "{{title}}" or start with "{TITLE_PREFIX}"')
+    try:
+        fmt.format(title="t", day="d", year="y", date=datetime(2026, 1, 1))
+    except (KeyError, IndexError, ValueError) as err:
+        raise ConfigError(f"title_format is invalid: {err}") from err
+    return fmt
 
 
 def validate(inputs):

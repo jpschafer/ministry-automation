@@ -30,7 +30,7 @@ def test_example_config_loads(env):  # pylint: disable=unused-argument
     slots = {d.slot for i in config.inputs for d in i.destinations}
     assert {"facebook:me", "youtube:mine"} <= slots
     assert config.youtube.client_id == "value-of-YT_CLIENT_ID"
-    assert config.title_date == "%b %-d, %Y"
+    assert config.title_format.startswith("{title} – {day}")
     assert config.poll_seconds == 30
 
 
@@ -72,3 +72,21 @@ inputs:
 """
     with pytest.raises(ConfigError, match="start of"):
         load_config(write(tmp_path, text))
+
+
+@pytest.mark.parametrize(
+    "line,expected",
+    [("", "{title} – {day}, {year} – {date:%b %-d, %Y}"),
+     ('title_format: "{title}"', "{title}"),
+     ('title_format: "{title} – {day}"', "{title} – {day}"),
+     ('title_date: "%Y-%m-%d"', "{title} – {date:%Y-%m-%d}"),  # older setting still works
+     ('title_date: ""', "{title}")],
+)
+def test_title_format(env, tmp_path, line, expected):  # pylint: disable=unused-argument
+    assert load_config(write(tmp_path, line + "\n" + BASE % "")).title_format == expected
+
+
+@pytest.mark.parametrize("fmt", ["{day} – {title}", "{title} – {sermon}"])
+def test_bad_title_format_is_rejected(env, tmp_path, fmt):  # pylint: disable=unused-argument
+    with pytest.raises(ConfigError, match="title_format"):
+        load_config(write(tmp_path, f'title_format: "{fmt}"\n' + BASE % ""))
