@@ -25,6 +25,7 @@ from datetime import datetime
 
 from .core import Egress, egress_id
 from .lectionary import describe as lectionary
+from .readings import block, readings_for
 from .http import RateLimitError
 from .log import event
 
@@ -215,7 +216,7 @@ class Reconciler:
         title = self._title(inp, now)
         event(log, logging.INFO, "go_live", key=f"{inp.name}:{dest.name}", target=dest.slot, title=title)
         video_id, url = self.platforms[dest.platform].create_live_video(
-            dest.target, dest.token, title, inp.description, dest.privacy
+            dest.target, dest.token, title, self._description(inp, now), dest.privacy
         )
         self._cache.pop(dest.slot, None)
         # If this fails the video exists without a feed; next tick sees
@@ -253,6 +254,12 @@ class Reconciler:
         when = datetime.fromtimestamp(now)  # local time (the container's TZ)
         day, year = lectionary(when)
         return self.config.title_format.format(title=inp.title, day=day, year=year, date=when)[:100]
+
+    def _description(self, inp, now):
+        """The input's description plus the day's readings, if any are filled in."""
+        day, year = lectionary(datetime.fromtimestamp(now))
+        parts = [inp.description.strip(), block(readings_for(self.config.readings_dir, day, year))]
+        return "\n\n".join(p for p in parts if p)
 
     def _owner(self, title):
         """The input a video belongs to, by its title (plain or dated), or None."""

@@ -13,6 +13,9 @@ poll_seconds: 30        # how often to re-read Facebook/YouTube once a stream is
 # {day} is the lectionary day (RCL), {year} "Year A/B/C", {date} strftime after the
 # colon, in the container's TZ. Must be "{title}" alone or start with "{title} – ".
 title_format: "{title} – {day}, {year} – {date:%b %-d, %Y}"
+# Readings for each day's description: readings/year-a.json etc. next to this file
+# (create them with: python -m sexton.readings init <folder>).
+# readings_dir: readings
 
 # Only needed with a youtube destination: the Google OAuth client (Desktop app).
 youtube:

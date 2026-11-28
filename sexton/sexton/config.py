@@ -82,6 +82,7 @@ class Config:
     verify_seconds: float = 120
     poll_seconds: float = 30
     title_format: str = DEFAULT_TITLE_FORMAT
+    readings_dir: str | None = None
     youtube: YouTubeConfig | None = None
     ntfy_url: str | None = None
     ntfy_token: str | None = field(default=None, repr=False)
@@ -176,6 +177,8 @@ def load_config(path):
         # fb_poll_seconds is the pre-YouTube name for the same setting.
         poll_seconds=float(raw.get("poll_seconds", raw.get("fb_poll_seconds", 30))),
         title_format=_title_format(raw),
+        # Relative to the config file, so /config/readings in the container.
+        readings_dir=os.path.join(os.path.dirname(os.path.abspath(path)), raw.get("readings_dir", "readings")),
         youtube=youtube,
         ntfy_url=_env("NTFY_URL", required=False),
         ntfy_token=_env("NTFY_TOKEN", required=False),

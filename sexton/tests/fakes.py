@@ -95,6 +95,7 @@ class FakeGraph:
         self.calls.append(("create", target))
         self._maybe_fail("create", target)
         vid = self.add(target, title, self.new_status)
+        self.videos[vid]["description"] = description
         return vid, self.videos[vid]["url"]
 
     def ingest_url(self, video_id, token):

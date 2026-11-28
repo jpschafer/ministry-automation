@@ -5,7 +5,9 @@
 The sexton rings the bells. This one goes live on Facebook (the church's Page and
 the personal profile) and YouTube whenever OBS/Mevo starts pushing to a church's
 Restreamer channel, and ends the broadcasts once the push has been gone for 3
-minutes. Every service becomes its own video, titled "<church title> – <date>".
+minutes. Every service becomes its own video, titled with the lectionary day,
+e.g. "Colfax UMC Worship – Proper 7, Year A – Jun 21, 2026", with that Sunday's
+readings in the description.
 
 Sexton replaces the Restreamer UI's Facebook and YouTube egresses: delete those
 from the UI (keep the channels themselves), or both will stream at once.
@@ -152,6 +154,33 @@ on stdout. For Unraid, use `unraid-template.xml` (copy it to
 Template: sexton) or `docker-compose.example.yml`.
 
 Tests: `pip install -r requirements-dev.txt && pytest`
+
+## Titles and readings
+
+Titles come from `title_format` in `config.yaml`. `{day}` is the Revised Common
+Lectionary day: holy days by name (Christmas Eve, Ash Wednesday, Good Friday...),
+otherwise the nearest Sunday ("Third Sunday in Lent", "Proper 7", "Christ the King
+(Proper 29)"). `{year}` is "Year A/B/C", which turns over on the First Sunday of
+Advent.
+
+Readings go in `readings/year-a.json`, `year-b.json` and `year-c.json` next to
+`config.yaml`, keyed by those day names, with whatever labels you like:
+
+```json
+"Proper 7": { "Old Testament": "Jeremiah 20:7-13", "New Testament": "Romans 6:1b-11" }
+```
+
+Filled-in entries are added to the stream description under "Readings"; blank or
+missing ones are skipped. Files are re-read for each new video, so edits apply
+without a restart. To create the files with every day name ready to fill in, or
+to add new day names to them later (never overwrites):
+
+```sh
+docker run --rm --user root --entrypoint python \
+  -v /mnt/user/appdata/automation/sexton:/config jpschafer/sexton:latest \
+  -m sexton.readings init /config/readings
+docker exec sexton python -m sexton.readings show /config/readings 2026-06-21
+```
 
 ## YouTube setup (one time)
 

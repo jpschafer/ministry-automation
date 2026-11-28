@@ -135,3 +135,19 @@ def describe(dt):
     d = dt.date() if isinstance(dt, datetime) else dt
     named = d if holy_day(dt) else nearest_sunday(d)
     return day_name(dt), f"Year {year_letter(named)}"
+
+
+def all_days():
+    """Every name day_name() can return, in church-year order (Advent first)."""
+    days = [f"{o} Sunday of Advent" for o in ORDINALS[:4]]
+    days += ["Christmas Eve", "Christmas Day", "First Sunday after Christmas Day",
+             "Second Sunday after Christmas Day", "Epiphany of the Lord", "Baptism of the Lord"]
+    days += [f"{o} Sunday after the Epiphany" for o in ORDINALS[1:9]]
+    days += ["Transfiguration Sunday", "Ash Wednesday"]
+    days += [f"{o} Sunday in Lent" for o in ORDINALS[:5]]
+    days += ["Palm/Passion Sunday", "Maundy Thursday", "Good Friday", "Holy Saturday", "Easter Sunday"]
+    days += [f"{o} Sunday of Easter" for o in ORDINALS[1:7]]
+    days += ["Ascension of the Lord", "Day of Pentecost", "Trinity Sunday"]
+    days += [f"Proper {n}" for n in range(1, 29)]
+    days += ["All Saints Day", "Christ the King (Proper 29)", "Thanksgiving Day"]
+    return days
